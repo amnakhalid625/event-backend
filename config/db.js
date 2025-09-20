@@ -1,23 +1,18 @@
 import mongoose from "mongoose";
 
-let isConnected = false; // Track the connection state
+let isConnected = false; // Track connection state
 
-export const connectDB = async () => {
-  if (isConnected) {
-    console.log("⚡ Using existing MongoDB connection");
-    return;
-  }
+const connectDB = async () => {
+  if (isConnected) return; // Agar pehle se connect hai to dobara mat connect karo
 
   try {
-    const db = await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    isConnected = db.connections[0].readyState === 1;
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    isConnected = conn.connections[0].readyState === 1;
     console.log("✅ MongoDB Connected");
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
     throw err;
   }
 };
+
+export default connectDB;
