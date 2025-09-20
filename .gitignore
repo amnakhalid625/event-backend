@@ -1,0 +1,25 @@
+# Node modules (bohot heavy hote hain, GitHub pe nahi dalte)
+node_modules/
+
+# Environment files (secret keys, Mongo URI, API keys)
+.env
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs
+*.log
+
+# Build/Cache folders (agar use karo to)
+dist/
+build/
+.cache/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Vercel/Deployment specific
+.vercel
