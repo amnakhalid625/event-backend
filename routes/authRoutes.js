@@ -8,6 +8,30 @@ import User from "../models/User.js";
 
 const router = express.Router();
 
+// ADDED: Base route to fix "Route not found" error
+router.get("/", (req, res) => {
+  res.json({ 
+    message: "Auth API working!",
+    endpoints: [
+      "POST /login",
+      "POST /register", 
+      "POST /signup",
+      "GET /profile",
+      "POST /logout",
+      "POST /forgot-password"
+    ]
+  });
+});
+
+// ADDED: Test route for debugging
+router.get("/test", (req, res) => {
+  res.json({ 
+    message: "Auth test route works!",
+    jwtSecretExists: !!process.env.JWT_SECRET,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // ------------------ REGISTER ------------------
 router.post("/register", async (req, res) => {
   const { fullName, email, password, role } = req.body;

@@ -1,13 +1,33 @@
 import express from 'express';
-import bcrypt from 'bcryptjs'; // Add this import - this was missing!
+import bcrypt from 'bcryptjs';
 import PublisherRequest from '../models/PublisherRequest.js';
 import User from '../models/User.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import { adminOnly } from '../middleware/role.js'; // Import adminOnly instead of roleMiddleware
+import { adminOnly } from '../middleware/role.js';
 
 const router = express.Router();
 
-// Remove custom adminMiddleware - use adminOnly from role.js instead
+// ADDED: Base route to fix "Route not found" error
+router.get("/", (req, res) => {
+  res.json({ 
+    message: "Admin API working!",
+    endpoints: [
+      "GET /dashboard-stats",
+      "GET /publisher-requests",
+      "GET /users",
+      "POST /run-seed"
+    ]
+  });
+});
+
+// ADDED: Test route for debugging
+router.get("/test", (req, res) => {
+  res.json({ 
+    message: "Admin test route works!",
+    jwtSecretExists: !!process.env.JWT_SECRET,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // GET /api/admin/dashboard-stats - Get admin dashboard statistics
 router.get('/dashboard-stats', authMiddleware, adminOnly, async (req, res) => {
@@ -362,7 +382,7 @@ router.delete('/users/:id', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
-// POST /api/admin/run-seed - Create admin user (Fixed with bcrypt import)
+// POST /api/admin/run-seed - Create admin user
 router.post('/run-seed', async (req, res) => {
   try {
     console.log('Running seed script to create admin user...');
