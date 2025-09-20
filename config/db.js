@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 
-let isConnected = false; // Track connection state
+let isConnected = false;
 
 const connectDB = async () => {
-  if (isConnected) return; // Agar pehle se connect hai to dobara mat connect karo
+  if (isConnected) return;
 
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);

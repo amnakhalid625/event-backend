@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { connectDB } from "./config/db.js";
+import connectDB from "./config/db.js"; // Change this line - remove destructuring
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -29,5 +29,4 @@ app.get("/", async (req, res) => {
   res.json({ message: "API is running successfully 🚀" });
 });
 
-// ⚠️ Do NOT use app.listen here for Vercel
 export default app;
