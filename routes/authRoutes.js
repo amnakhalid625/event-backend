@@ -141,19 +141,11 @@ router.post("/logout", (req, res) => {
 
 // ------------------ FORGOT PASSWORD ------------------
 router.post("/forgot-password", async (req, res) => {
-  console.log("=== FORGOT PASSWORD REQUEST ===");
-  console.log("Request body:", req.body);
-  console.log("Environment check:");
-  console.log("EMAIL_USER:", process.env.EMAIL_USER);
-  console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
-  console.log("EMAIL_PASS length:", process.env.EMAIL_PASS?.length);
-  
   const { email } = req.body;
   
   try {
     // Input validation
     if (!email) {
-      console.log("❌ No email provided");
       return res.status(400).json({ 
         success: false, 
         message: "Email is required" 
@@ -163,38 +155,27 @@ router.post("/forgot-password", async (req, res) => {
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log("❌ Invalid email format:", email);
       return res.status(400).json({ 
         success: false, 
         message: "Please provide a valid email address" 
       });
     }
 
-    console.log("🔍 Looking for user with email:", email);
     const user = await User.findOne({ email });
-    
     if (!user) {
-      console.log("❌ User not found for email:", email);
       return res.status(400).json({ 
         success: false, 
         message: "No account found with this email address" 
       });
     }
-    
-    console.log("✅ User found:", user._id);
 
     // Generate secure reset token
-    console.log("🔑 Generating reset token...");
     const resetToken = crypto.randomBytes(32).toString("hex");
     user.resetToken = resetToken;
     user.resetTokenExpiry = Date.now() + 3600000; // 1 hour
-    
-    console.log("💾 Saving user with reset token...");
     await user.save();
-    console.log("✅ Reset token saved to database");
 
     // Create email transporter (FIXED: createTransport, not createTransporter)
-    console.log("📧 Creating email transporter...");
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -204,22 +185,15 @@ router.post("/forgot-password", async (req, res) => {
     });
 
     // Verify transporter configuration
-    console.log("🔐 Verifying email configuration...");
     try {
       await transporter.verify();
-      console.log("✅ Email server is ready to send messages");
+      console.log("Email server is ready to send messages");
     } catch (error) {
-      console.error("❌ Email server verification failed:", error);
-      console.error("Email config details:", {
-        user: process.env.EMAIL_USER,
-        hasPass: !!process.env.EMAIL_PASS,
-        passLength: process.env.EMAIL_PASS?.length
-      });
+      console.error("Email server verification failed:", error);
       throw new Error("Email service configuration error");
     }
 
     const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password/${resetToken}`;
-    console.log("🔗 Reset URL generated:", resetUrl);
 
     // Enhanced email template
     const mailOptions = {
@@ -313,7 +287,6 @@ router.post("/forgot-password", async (req, res) => {
     });
   }
 });
-
 // ------------------ RESET PASSWORD ------------------
 router.post("/reset-password/:token", async (req, res) => {
   try {
