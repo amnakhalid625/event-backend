@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import connectDB from "./config/db.js"; // Change this line - remove destructuring
+import connectDB from "./config/db.js";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -23,10 +23,23 @@ app.use("/api/publisher", publisherRoutes);
 app.use("/api/advertiser", advertiseRoutes);
 app.use("/api/admin", adminRoutes);
 
-// Basic route
+// Basic route - ADD ERROR HANDLING
 app.get("/", async (req, res) => {
-  await connectDB();
-  res.json({ message: "API is running successfully 🚀" });
+  try {
+    await connectDB();
+    res.json({ message: "API is running successfully 🚀" });
+  } catch (error) {
+    console.error("Database connection error:", error);
+    res.status(500).json({ 
+      error: "Database connection failed",
+      message: error.message 
+    });
+  }
+});
+
+// Add 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({ error: "Route not found" });
 });
 
 export default app;
