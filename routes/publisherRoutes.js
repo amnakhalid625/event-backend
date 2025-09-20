@@ -2,7 +2,7 @@ import express from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import PublisherRequest from "../models/PublisherRequest.js";
 import User from "../models/User.js";
-import WebsiteAnalyticsService from "../../frontend/src/services/analyticsService.js";
+// import WebsiteAnalyticsService from "../../frontend/src/services/analyticsService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
