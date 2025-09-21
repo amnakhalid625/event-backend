@@ -13,7 +13,6 @@ const connectDB = async () => {
 
     console.log("Attempting to connect to MongoDB...");
 
-    // Fixed connection options for serverless functions
     const conn = await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 5000,  // 5 seconds to select server
       socketTimeoutMS: 10000,          // 10 seconds for socket operations
