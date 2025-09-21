@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-// ✅ Create Publisher Account + Request with Website Analysis
+// ✅ Create Publisher Account + Request (Fixed for your flow)
 router.post("/create", async (req, res) => {
   try {
     const { 
@@ -19,27 +19,35 @@ router.post("/create", async (req, res) => {
       socialMedia = {}
     } = req.body;
 
+    console.log('Publisher request creation attempt:', { email, companyName, website });
+
+    // Validation
+    if (!fullName || !email || !password || !companyName || !website || !category) {
+      return res.status(400).json({ message: "All required fields must be provided" });
+    }
+
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({ message: "User already exists with this email" });
     }
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user with proper role
+    // Create user with "user" role (will be changed to "publisher" after approval)
     user = new User({
       fullName,
       email,
       password: hashedPassword,
-      role: "user" // Start as user, will be changed to publisher when approved
+      role: "user" // Start as user, becomes publisher after admin approval
     });
     await user.save();
+    console.log('User created:', user.email);
 
-    // 🔥 Website analysis - simplified for now
-    let websiteAnalysis = {
+    // Simple website analysis (no external service needed)
+    const websiteAnalysis = {
       title: '',
       description: '',
       monthlyTraffic: monthlyTrafficAhrefs || 0,
@@ -50,37 +58,11 @@ router.post("/create", async (req, res) => {
       domainAuthority: domainAuthority || 0,
       pageAuthority: pageAuthority || 0,
       ahrefsTraffic: monthlyTrafficAhrefs || 0,
-      topTrafficCountry: topTrafficCountry || '',
+      topTrafficCountry: topTrafficCountry || 'Unknown',
       socialMedia: socialMedia || {},
       lastAnalyzed: new Date(),
       analysisSource: 'manual'
     };
-
-    // If you have website analytics service, uncomment this:
-    /*
-    try {
-      console.log('Analyzing website:', website);
-      const analyticsResult = await WebsiteAnalyticsService.analyzeWebsite(website, {
-        socialLinks: socialMedia,
-        similarWebApiKey: process.env.SIMILARWEB_API_KEY
-      });
-      
-      websiteAnalysis = {
-        ...websiteAnalysis,
-        title: analyticsResult.websiteInfo?.title || '',
-        description: analyticsResult.websiteInfo?.description || '',
-        monthlyTraffic: analyticsResult.trafficData?.monthlyVisits || monthlyTrafficAhrefs || 0,
-        trustScore: analyticsResult.analysis?.trustScore || 0,
-        hasAnalytics: analyticsResult.websiteInfo?.hasAnalytics || false,
-        analysisSource: 'automatic'
-      };
-      
-      console.log('Website analysis completed');
-    } catch (error) {
-      console.error('Website analysis failed:', error.message);
-      websiteAnalysis.errors = [error.message];
-    }
-    */
 
     // Create publisher request with all data
     const publisherRequest = new PublisherRequest({
@@ -125,7 +107,7 @@ router.post("/create", async (req, res) => {
       // Website Analytics Data
       websiteAnalysis: websiteAnalysis,
       
-      // Additional fields
+      // Additional fields for better management
       businessType: "other",
       monthlyPageViews: monthlyTrafficAhrefs || 0,
       primaryTrafficSource: "organic",
@@ -153,12 +135,13 @@ router.post("/create", async (req, res) => {
     });
     
     await publisherRequest.save();
+    console.log('Publisher request created:', publisherRequest._id);
 
-    // Generate JWT token
+    // Generate JWT token for immediate login
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
     res.status(201).json({
-      message: "Publisher request created successfully",
+      message: "Publisher request submitted successfully. Please wait for admin approval.",
       token,
       user: {
         id: user._id,
@@ -180,11 +163,11 @@ router.post("/create", async (req, res) => {
     });
   } catch (err) {
     console.error('Publisher creation error:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message || "Failed to create publisher request" });
   }
 });
 
-// ✅ Re-analyze website data
+// ✅ Re-analyze website data (simplified without external service)
 router.post("/analyze-website/:requestId", authMiddleware, async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -199,8 +182,7 @@ router.post("/analyze-website/:requestId", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Publisher request not found" });
     }
 
-    // For now, just update the analysis timestamp
-    // In future, implement WebsiteAnalyticsService.analyzeWebsite
+    // Simple re-analysis (update timestamp and social media)
     publisherRequest.websiteAnalysis.lastAnalyzed = new Date();
     if (socialMedia) {
       publisherRequest.websiteAnalysis.socialMedia = socialMedia;
@@ -229,13 +211,12 @@ router.get("/", authMiddleware, async (req, res) => {
     const requestsWithAnalytics = requests.map(req => ({
       ...req.toObject(),
       analyticsSummary: {
-        totalAudience: (req.websiteAnalysis?.monthlyTraffic || 0) + 
-                      (req.audienceSize || 0),
+        totalAudience: (req.websiteAnalysis?.monthlyTraffic || 0) + (req.audienceSize || 0),
         trustLevel: req.websiteAnalysis?.trustScore >= 70 ? 'High' : 
                    req.websiteAnalysis?.trustScore >= 40 ? 'Medium' : 'Low',
         hasVerifiedData: req.websiteAnalysis?.hasAnalytics || false,
         priceRange: req.pricing?.standardPostPrice ? 
-                   `${req.pricing.standardPostPrice}${req.pricing.grayNichePrice ? ` - ${req.pricing.grayNichePrice}` : ''}` 
+                   `$${req.pricing.standardPostPrice}${req.pricing.grayNichePrice ? ` - $${req.pricing.grayNichePrice}` : ''}` 
                    : 'Not Set'
       }
     }));
@@ -266,7 +247,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Update publisher request
+// ✅ Update publisher request (only if pending or rejected)
 router.put("/:id", authMiddleware, async (req, res) => {
   try {
     const request = await PublisherRequest.findOne({
@@ -287,8 +268,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
     const allowedFields = [
       'companyName', 'website', 'category', 'grayNiches', 'audienceSize', 
       'phone', 'address', 'domainAuthority', 'pageAuthority', 
-      'monthlyTrafficAhrefs', 'topTrafficCountry', 'pricing', 'linkDetails', 
-      'contentDetails'
+      'monthlyTrafficAhrefs', 'topTrafficCountry', 'pricing'
     ];
 
     allowedFields.forEach(field => {
@@ -358,7 +338,7 @@ router.get("/verify-website/:url", authMiddleware, async (req, res) => {
     const { url } = req.params;
     const decodedUrl = decodeURIComponent(url);
     
-    // Simple URL validation
+    // Simple URL validation (no external service needed)
     try {
       new URL(decodedUrl);
       res.json({
@@ -383,7 +363,7 @@ router.get("/verify-website/:url", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Delete publisher request (if pending)
+// ✅ Delete publisher request (only if pending or rejected)
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const request = await PublisherRequest.findOne({
