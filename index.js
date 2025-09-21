@@ -48,9 +48,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
+// Routes - CORRECT MAPPING
 app.use("/api/auth", authRoutes);
-app.use("/api/publisher", publisherRoutes);
+app.use("/api/publisher-requests", publisherRoutes);  // Changed this line
 app.use("/api/advertiser", advertiseRoutes);
 app.use("/api/admin", adminRoutes);
 
