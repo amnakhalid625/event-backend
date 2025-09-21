@@ -127,24 +127,18 @@ const publisherRequestSchema = new mongoose.Schema({
   domainAuthority: { 
     type: Number, 
     min: 0, 
-    max: 100,
-    default: 0
+    max: 100 
   },
   pageAuthority: { 
     type: Number, 
     min: 0, 
-    max: 100,
-    default: 0
+    max: 100 
   },
   monthlyTrafficAhrefs: { 
     type: Number, 
-    min: 0,
-    default: 0
+    min: 0 
   },
-  topTrafficCountry: {
-    type: String,
-    default: ''
-  },
+  topTrafficCountry: String,
   
   // Pricing
   pricing: {
@@ -155,8 +149,7 @@ const publisherRequestSchema = new mongoose.Schema({
     },
     grayNichePrice: { 
       type: Number, 
-      min: 0,
-      default: 0
+      min: 0 
     }
   },
   
@@ -238,15 +231,6 @@ const publisherRequestSchema = new mongoose.Schema({
   adminNotes: String,
   rejectionReason: String,
   approvalDate: Date,
-  reviewedBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User" 
-  },
-  reviewedAt: Date,
-  approvedBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User" 
-  },
   
   // Performance tracking
   performanceMetrics: {
@@ -267,8 +251,6 @@ publisherRequestSchema.index({ "pricing.standardPostPrice": 1 });
 publisherRequestSchema.index({ "websiteAnalysis.monthlyTraffic": -1 });
 publisherRequestSchema.index({ "websiteAnalysis.trustScore": -1 });
 publisherRequestSchema.index({ "websiteAnalysis.domainAuthority": -1 });
-publisherRequestSchema.index({ email: 1 });
-publisherRequestSchema.index({ website: 1 });
 
 // Virtual for total audience (website + social)
 publisherRequestSchema.virtual('totalAudience').get(function() {
@@ -344,19 +326,5 @@ publisherRequestSchema.statics.findByPriceRange = function(minPrice, maxPrice) {
 publisherRequestSchema.methods.acceptsGrayNiche = function(niche) {
   return this.grayNiches.includes(niche);
 };
-
-// Pre-save middleware to set default values
-publisherRequestSchema.pre('save', function(next) {
-  if (!this.websiteAnalysis) {
-    this.websiteAnalysis = {
-      monthlyTraffic: this.monthlyTrafficAhrefs || 0,
-      domainAuthority: this.domainAuthority || 0,
-      pageAuthority: this.pageAuthority || 0,
-      topTrafficCountry: this.topTrafficCountry || 'Unknown',
-      lastAnalyzed: new Date()
-    };
-  }
-  next();
-});
 
 export default mongoose.model("PublisherRequest", publisherRequestSchema);
