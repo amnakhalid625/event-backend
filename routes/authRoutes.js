@@ -5,10 +5,11 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import User from "../models/User.js";
+import connectDB from "../config/db.js";
 
 const router = express.Router();
 
-// ADDED: Base route to fix "Route not found" error
+// Base route to fix "Route not found" error
 router.get("/", (req, res) => {
   res.json({ 
     message: "Auth API working!",
@@ -23,7 +24,7 @@ router.get("/", (req, res) => {
   });
 });
 
-// ADDED: Test route for debugging
+// Test route for debugging
 router.get("/test", (req, res) => {
   res.json({ 
     message: "Auth test route works!",
@@ -34,45 +35,91 @@ router.get("/test", (req, res) => {
 
 // ------------------ REGISTER ------------------
 router.post("/register", async (req, res) => {
-  const { fullName, email, password, role } = req.body;
-
   try {
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "User already exists" });
+    await connectDB(); // Connect to database
+    
+    const { fullName, email, password, role } = req.body;
 
+    console.log("Register attempt:", { fullName, email, role });
+
+    // Validation
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    user = new User({ fullName, email, password: hashedPassword, role });
+    // Create user
+    user = new User({ 
+      fullName, 
+      email, 
+      password: hashedPassword, 
+      role: role || 'user' 
+    });
+    
     await user.save();
+    console.log("User registered successfully:", user.email);
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
+    console.error("Register error:", err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // ------------------ SIGNUP (Alternative endpoint for frontend consistency) ------------------
 router.post("/signup", async (req, res) => {
-  const { name, fullName, email, password, role } = req.body;
-
   try {
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "User already exists" });
+    await connectDB(); // Connect to database
+    
+    const { name, fullName, email, password, role } = req.body;
 
+    console.log("Signup attempt:", { name, fullName, email, role });
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Use fullName if provided, otherwise use name
-    const userFullName = fullName || name;
+    const userFullName = fullName || name || "User";
 
+    // Create user
     user = new User({ 
       fullName: userFullName, 
       email, 
       password: hashedPassword, 
-      role 
+      role: role || 'user'
     });
+    
     await user.save();
+    console.log("User signed up successfully:", user.email);
 
     // Generate token for immediate login after signup
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
@@ -88,22 +135,43 @@ router.post("/signup", async (req, res) => {
       }
     });
   } catch (err) {
+    console.error("Signup error:", err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // ------------------ LOGIN ------------------
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    await connectDB(); // Connect to database
+    
+    const { email, password } = req.body;
+
+    console.log("Login attempt for email:", email);
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Find user
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) {
+      console.log("User not found:", email);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
+    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) {
+      console.log("Password mismatch for user:", email);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
+    // Generate token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+
+    console.log("Login successful for user:", email);
 
     res.json({
       token,
@@ -115,6 +183,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -122,15 +191,30 @@ router.post("/login", async (req, res) => {
 // ------------------ GET PROFILE ------------------
 router.get("/profile", async (req, res) => {
   try {
+    await connectDB(); // Connect to database
+    
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "No token provided" });
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("-password");
 
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     res.json(user);
   } catch (err) {
-    res.status(401).json({ message: "Invalid token" });
+    console.error("Profile error:", err);
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: "Token expired" });
+    }
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -141,9 +225,11 @@ router.post("/logout", (req, res) => {
 
 // ------------------ FORGOT PASSWORD ------------------
 router.post("/forgot-password", async (req, res) => {
-  const { email } = req.body;
-  
   try {
+    await connectDB(); // Connect to database
+    
+    const { email } = req.body;
+    
     // Input validation
     if (!email) {
       return res.status(400).json({ 
@@ -175,7 +261,7 @@ router.post("/forgot-password", async (req, res) => {
     user.resetTokenExpiry = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // Create email transporter (FIXED: createTransport, not createTransporter)
+    // Create email transporter
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -224,7 +310,6 @@ router.post("/forgot-password", async (req, res) => {
           <p style="color: #999; font-size: 12px;">This is an automated message, please do not reply.</p>
         </div>
       `,
-      // Fallback plain text version
       text: `
         Password Reset Request
         
@@ -238,12 +323,12 @@ router.post("/forgot-password", async (req, res) => {
       `
     };
 
-    console.log("📤 Sending password reset email...");
+    console.log("Sending password reset email...");
     console.log("From:", process.env.EMAIL_USER);
     console.log("To:", user.email);
     
     await transporter.sendMail(mailOptions);
-    console.log("✅ Password reset email sent successfully!");
+    console.log("Password reset email sent successfully!");
 
     res.json({ 
       success: true, 
@@ -251,12 +336,7 @@ router.post("/forgot-password", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ FORGOT PASSWORD ERROR:", err);
-    console.error("Error details:", {
-      message: err.message,
-      code: err.code,
-      stack: err.stack
-    });
+    console.error("FORGOT PASSWORD ERROR:", err);
     
     // More specific error handling
     if (err.message.includes("Email service")) {
@@ -273,7 +353,6 @@ router.post("/forgot-password", async (req, res) => {
       });
     }
 
-    // Gmail specific errors
     if (err.message.includes("Invalid login") || err.message.includes("Username and Password not accepted")) {
       return res.status(500).json({ 
         success: false, 
@@ -287,9 +366,12 @@ router.post("/forgot-password", async (req, res) => {
     });
   }
 });
+
 // ------------------ RESET PASSWORD ------------------
 router.post("/reset-password/:token", async (req, res) => {
   try {
+    await connectDB(); // Connect to database
+    
     const { token } = req.params;
     const { password } = req.body;
 
@@ -302,16 +384,21 @@ router.post("/reset-password/:token", async (req, res) => {
       resetTokenExpiry: { $gt: Date.now() }, // token still valid
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
 
+    // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
-    // clear reset fields
+    // Clear reset fields
     user.resetToken = null;
     user.resetTokenExpiry = null;
 
     await user.save();
+
+    console.log("Password reset successful for user:", user.email);
 
     res.json({ message: "Password reset successful" });
   } catch (err) {
